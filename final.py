@@ -50,44 +50,44 @@ class Stack(object):
 
     def top(self):
         return self.values[-1]
-val1 = Stack()
+stk = Stack()
 
 def pop_top(current):
-    val1.pop()
+    stk.pop()
     return current+1
 
 def unary_not(current):
-    val1.push(not val1.pop())
+    stk.push(not stk.pop())
     return current + 1
 
 def binary_add(current):
-    val1 = val1.pop()
-    val2 = val1.pop()
-    val1.push(val2 + val1)
+    val1 = stk.pop()
+    val2 = stk.pop()
+    stk.push(val2 + val1)
     return current + 1
 
 def binary_mul(current):
-    val1 = val1.pop()
-    val2 = val1.pop()
-    val1.push(val2 * val1)
+    val1 = stk.pop()
+    val2 = stk.pop()
+    stk.push(val2 * val1)
     return current + 1
 
 def binary_sub(current):
-    val1 = val1.pop()
-    val2 = val1.pop()
-    val1.push(val2 - val1)
+    val1 = stk.pop()
+    val2 = stk.pop()
+    stk.push(val2 - val1)
     return current + 1
 
 def binary_div(current):
-    val1 = val1.pop()
-    val2 = val1.pop()
-    val1.push(val2 / val1)
+    val1 = stk.pop()
+    val2 = stk.pop()
+    stk.push(val2 / val1)
     return current + 1
 
 def binary_modulo(current):
-    val1 = val1.pop()
-    val2 = val1.pop()
-    val1.push(val2 % val1)
+    val1 = stk.pop()
+    val2 = stk.pop()
+    stk.push(val2 % val1)
     return current + 1
 
 
