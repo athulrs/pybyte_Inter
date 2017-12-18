@@ -1,5 +1,4 @@
 import sys
-
 #bytecode values
 HAVE_ARG = 90
 LOAD_CONSTANT = 0x64
@@ -37,497 +36,380 @@ TYPE_INTERN = 0x74
 TYPE_SREF = 0x52
 FUNCTION_START = 0x43
 
+INT_LIMIT = 2 ** 20
+stringref=[]
+name_value={}
 
 class Stack(object):
     def __init__(self):
-        self.values = []
-
-    def push(self, elem):
-        self.values.append(elem)
-
+        self.stack=[]
+    def push(self,data):
+        self.stack.append(data)
     def pop(self):
-        return self.values.pop()
-
+        return self.stack.pop()
     def top(self):
         return self.values[-1]
-stk = Stack()
+    def print_stack(self):
+        print(self.stack)     
 
-def pop_top(current):
-    stk.pop()
-    return current+1
+stak = Stack()
 
-def unary_not(current):
-    stk.push(not stk.pop())
-    return current + 1
+def execute(code_obj):
+    while cur<len(code_obj.code):
+        opcode = code_obj.code[cur]
+        if opcode == LOAD_CONSTANT:   
+            operand = get_oparg(code_obj.code,cur)
+            stak.push(consts[operand])
+            cur+=3
 
-def binary_add(current):
-    val1 = stk.pop()
-    val2 = stk.pop()
-    stk.push(val2 + val1)
-    return current + 1
+        elif opcode == STORE_NAME:  
+            operand = get_oparg(code_obj.code,cur)
+            n = stak.pop()
+            if name_value(code_obj.names[operand]):
+                name_value[code_obj.names[operand]] = n
+            code_obj.names[operand] = n
+            cur+=3
 
-def binary_mul(current):
-    val1 = stk.pop()
-    val2 = stk.pop()
-    stk.push(val2 * val1)
-    return current + 1
+        elif opcode == PRINT_ITEM:   
+            print(stak.pop())
+            cur+=1
 
-def binary_sub(current):
-    val1 = stk.pop()
-    val2 = stk.pop()
-    stk.push(val2 - val1)
-    return current + 1
+        elif opcode == PRINT_NEWLINE :    
+            print()
+            cur+=1
 
-def binary_div(current):
-    val1 = stk.pop()
-    val2 = stk.pop()
-    stk.push(val2 / val1)
-    return current + 1
+        elif opcode == SETUP_LOOP:
+            cur+=3
 
-def binary_modulo(current):
-    val1 = stk.pop()
-    val2 = stk.pop()
-    stk.push(val2 % val1)
-    return current + 1
+        elif opcode == LOAD_NAME:      
+            oparg = get_oparg(code_obj.code,cur)
+            stak.push(code_obj.names[oparg])
+            cur+=3
 
+        elif opcode == JUMP_ABSOLUTE :   
+            cur = functions.get_oparg(code_obj.code,cur)
 
-def print_item(current):
-    print(val1.get_top_n(0),)
-    return current + 1
+        elif opcode == POP_BLOCK :
+            cur+=1
 
+        elif opcode == RETURN_VALUE:    
+            return stak.pop()
 
-def print_newline(current):
-    print
-    return current + 1
+        elif opcode == COMPARE_OP:    
+            opname = get_oparg(code_obj.code,cur)
+            op1 = stak.pop()
+            op2 = stak.pop()
+            stak.push(compare_func[opname](op2,op1))
+            cur+=3
 
+        elif opcode == POP_JUMP_IF_FALSE:  
+            tar = get_oparg(code_obj.code,cur)
+            value = stak.pop()
+            if not value: 
+                cur=tar
+            else: 
+                cur+=3
 
-def load_name(objcode, current):
-    oparg = objcode.get_oparg(current)
-    name = objcode.names[oparg]
-    if type(name) == int:
-        val1.push(name)
-    else:
-        val1.push(objcode.names[oparg][0])
-    return current + 3
+        elif opcode == POP_JUMP_IF_TRUE: 
+            tar = get_oparg(code_obj.code,cur)
+            value = stak.pop()
+            if value:
+                cur=target
+            else:
+                cur+=3
 
+        elif opcode == BINARY_ADD:   
+            stak.push(stak.pop() + stak.pop())
+            cur+=1
 
-def load_const(objcode, current):
-    oparg = objcode.get_oparg(current)
-    val1.push(objcode.consts[oparg])
-    return current + 3
+        elif opcode == BINARY_MULTIPLY:  
+            stak.push(stak.pop() * stak.pop())
+            cur+=1
 
+        elif opcode == BINARY_DIVIDE: 
+            op1=stak.pop()
+            op2=stak.pop()
+            stak.push(op2 / op1)
+            cur+=1
 
-def load_global(objcode, current):
-    oparg = objcode.get_oparg(current)
-    val1.push(objcode.names[oparg][0])
-    return current + 3
+        elif opcode == BINARY_MODULO:   
+            op1=stak.pop()
+            op2=stak.pop()
+            stak.push(op2 % op1)
+            cur+=1
 
+        elif opcode == BINARY_SUBTRACT:  
+            op1=stak.pop()
+            op2=stak.pop()
+            stak.push(op2 - op1)
+            cur+=1
 
-def load_fast(objcode, current):
-    oparg = objcode.get_oparg(current)
-    val1.push(objcode.varnames[oparg])
-    return current + 3
+        elif opcode == UNARY_NOT:    
+            stak.push(not stak.pop())
+            cur+=1
 
+        elif opcode == JUMP_FORWARD:        
+            tar = get_oparg(code_obj.code,cur)
+            cur+= tar+3
 
-def store_name(objcode, current):
-    oparg = objcode.get_oparg(current)
-    objcode.names[oparg] = val1.pop()
-    return current + 3
+        elif opcode == MAKE_FUNCTION:    
+            operand = get_oparg(code_obj.code,cur)
+            cur+=3
 
+        elif opcode == CALL_FUNCTION:   
+            argc = get_oparg(code_obj.code,cur)
+            fun = stak.get_top_n(argc)
+            save_local = fun.varnames[:]
+            while argc:
+                argc -= 1
+                fun.varnames[argc] = stak.pop()
+            stak.pop()
+            rtrn = execute(fun)
+            stak.push(rtrn)
+            fun.varnames = save_local[:]
+            cur+=3
 
-def store_fast(objcode, current):
-    oparg = objcode.get_oparg(current)
-    objcode.varnames[oparg] = val1.pop()
-    return current + 3
+        elif opcode == LOAD_FAST:   
+            oparg = get_oparg(code_obj.code,cur)
+            stak.push(code_obj.varnames[oparg])
+            cur+=3
 
+        elif opcode == STORE_FAST:   
+            oparg = get_oparg(code_obj.code,cur)
+            code_obj.varnames[oparg]=stak.pop()
+            cur+=3
 
-def setup_loop(objcode, current):
-    return current + 3
+        elif opcode == LOAD_GLOBAL: 
+            oparg = get_oparg(code_obj.code,cur)
+            if name_value[code_obj.names[oparg]]:
+                stak.push(name_value[code_obj.names[oparg]])
+            else:
+                stak.push(code_obj.names[oparg])
+            cur+=3
 
+        elif opcode == POP_TOP : 
+            top=stak.pop()
+            nex=stak.pop()
+            stak.push(nex[top])
+            cur+=1
 
-def pop_block(current):
-    return current + 1
-
-
-def pop_jump_if_false(objcode, current):
-    if not val1.pop():
-        return objcode.get_oparg(current)
-    else:
-        return current + 3
-
-
-def pop_jump_if_true(objcode, current):
-    if val1.pop():
-        return objcode.get_oparg(current)
-    else:
-        return current + 3
-
-
-def jump_forward(objcode, current):
-    return current + 3 + objcode.get_oparg(current)
-
-
-def jump_absolute(objcode, current):
-    return objcode.get_oparg(current)
-
-
-def make_function(objcode, current):
-    return current + 9
+        else:
+            if opcode>=90:
+                cur+=3
+            else:
+                cur+=1                   
 
 
 def less_than(op1, op2):
     return op1 < op2
 
-
 def less_equal(op1, op2):
     return op1 <= op2
-
 
 def equal(op1, op2):
     return op1 == op2
 
-
 def not_equal(op1, op2):
     return op1 != op2
 
-
 def greater_than(op1, op2):
     return op1 > op2
-
 
 def grt_equal(op1, op2):
     return op1 >= op2
 
 
-comparisons = {
-    0: less_than,
-    1: less_equal,
-    2: equal,
-    3: not_equal,
-    4: greater_than,
-    5: grt_equal
-}
+compare_func = {
+               0: less_than,
+               1: less_equal,
+               2: equal,
+               3: not_equal,
+               4: greater_than,
+               5: grt_equal }
 
 
-def compare_op(objcode, current):
-    top = val1.pop()
-    top1 = val1.pop()
-    oparg = objcode.get_oparg(current)
-    val1.push(comparisons[oparg](top1, top))
-    return current + 3
+class code(object):
+    def __init__(self,pyc_lst,cur=0):
+        self.pyclst=pyc_lst
+        self.cur=cur
+        self.code=self.get_code()       
+        self.consts = self.get_consts()
+        self.names = self.get_names()
+        self.varnames = self.get_varnames()
+        self.name=self.get_name()
 
-operations = {
-    BINARY_ADD: binary_add,
-    BINARY_SUBTRACT: binary_sub,
-    BINARY_MULTIPLY: binary_mul,
-    BINARY_DIVIDE: binary_div,
-    BINARY_MODULO: binary_modulo,
-    LOAD_NAME: load_name,
-    LOAD_FAST: load_fast,
-    LOAD_CONSTANT: load_const,
-    LOAD_GLOBAL: load_global,
-    STORE_NAME: store_name,
-    STORE_FAST: store_fast,
-    PRINT_ITEM: print_item,
-    PRINT_NEWLINE: print_newline,
-    POP_JUMP_IF_FALSE: pop_jump_if_false,
-    POP_JUMP_IF_TRUE: pop_jump_if_true,
-    JUMP_FORWARD: jump_forward,
-    JUMP_ABSOLUTE: jump_absolute,
-    COMPARE_OP: compare_op,
-    UNARY_NOT: unary_not,
-    POP_TOP: pop_top,
-    MAKE_FUNCTION: make_function,
-    SETUP_LOOP: setup_loop,
-    POP_BLOCK: pop_block
-} 
-
-
-names = {}
-name_cnt = 0
-
-
-class Code(object):
-
-    def __init__(self, pyclist, current=0):
-        self.pyclist = pyclist
-        self.current = current
-        self.code = self.fun_code()
-        self.consts = self.fun_consts()
-        self.names = self.fun_names()
-        self.varnames = self.fun_names()
-        self.name = self.acq_name()
-
-    def get_name(self):
-        return self.name
-
-    def get_current(self):
-        return self.current
-
-    def get_pyclist(self):
-        return self.pyclist
-
-    def get_opcode(self, current):
-        return self.code[current]
-
-    def get_oparg(self, current):
-        return decimal(self.code, current)
-
-    def is_end(self, current):
-        if current >= len(self.code):
-            return True
-        else:
-            return False
-
-    def fun_code(self):
-        pyclist = self.pyclist
-        current = start_of_code(pyclist, self.current)
-        end = current + decimal(pyclist, current-5, 4)
-        code = []
-        while current < end:
-            if not is_func_def(current, pyclist):
-                if have_arg(pyclist[current]):
-                    code.extend(pyclist[current:current+3])
-                    current += 3
-                else:
-                    code.append(pyclist[current])
-                    current += 1
+    def get_code(self):
+        pyc_lst=self.pyclst
+        cur=self.cur
+        code=[]
+        if chr(pyc_lst[cur])== TYPE_CODE and chr(pyc_lst[cur+17])== TYPE_STRING:
+           self.argcount = dec(cur,pyc_lst)
+           if self.argcount >= INT_LIMIT:
+                self.argcount -= (2 * INT_LIMIT)
+           cur+=17
+           size = dec(cur,pyc_lst)
+           cur+=5
+           for i in range(size):
+               code.append(pyc_lst[cur+i])
+           cur = cur+size
+        self.cur = cur
+        return code   
+           
+    def get_consts(self):
+        pyc_lst=self.pyclst
+        cur=self.cur
+        consts=[]
+        size = dec(cur,pyc_lst)
+        cur += 5
+        for i in range(size):
+            if chr(pyc_lst[cur]) == TYPE_INTEGER:  
+                x = dec(cur,pyc_lst)
+                if x >= INT_LIMIT:                    
+                    x = x - (2 * INT_LIMIT)
+                consts.append(x)
+                cur += 5
+            elif pyc_lst[cur] == TYPE_NONE: 
+                consts.append(None)
+                cur += 1
+            elif chr(pyc_lst[cur])== TYPE_STRING or pyc_lst[cur]== TYPE_TUPLE: 
+                char=chr(pyc_lst[cur])
+                length = dec(cur,pyc_lst)
+                cur += 5
+                strng=''
+                for j in range(length):
+                    strng += chr(pyc_lst[cur+j])
+                cur = cur+length
+                if char == TYPE_STRING:
+                     stringref.append(strng)
+                consts.append(strng)
+            elif chr(pyc_lst[cur])== TYPE_CODE :  
+                code_obj=code(pyc_lst,cur)
+                cur=code_obj.cur
+                consts.append(code_obj)
             else:
-                code.append(MAKE_FUNCTION)
-                code.extend([0] * 8)
-                current += 9
-        self.current = current
-        return code
-
-
-    def fun_consts(self):
-        current = self.current
-        pyclist = self.pyclist
-        num_co = decimal(pyclist, current, 4)
-        current += 5
-        consts = []
-        for n in range(num_co):
-            if pyclist[current] == TYPE_INTEGER:
-                consts.append(decimal(pyclist, current, 4))
-                current += 5
-            elif pyclist[current] == TYPE_NONE:
-                consts.append(0)
-                current += 1
-            elif pyclist[current] == TYPE_CODE:
-                objcode = Code(pyclist, current)
-                f_idx = objcode.get_name()
-                consts.append(objcode)
-                names[f_idx][0] = objcode
-                current = end_of_code(pyclist, current)
-        self.current = current
+                return
+        self.cur=cur
         return consts
 
-    def fun_names(self):
-        global name_cnt
-        current = self.current
-        pyclist = self.pyclist
-        n_names = decimal(pyclist, current)
-        func_idx = 0
-        current += 5
-        co_names = {}
-        idx = 0
-        for n in range(n_names):
-            if (pyclist[current] == TYPE_INTERN):
-                names[name_cnt] = [0]
-                co_names[idx] = names[name_cnt]
-                name_cnt += 1
-                idx += 1
-                current = skip_element(pyclist, current)
-            elif (pyclist[current] == TYPE_SREF):
-                func_idx = decimal(pyclist, current)
-                co_names[idx] = names[func_idx]
-                idx += 1
-                current += 5
-            else:
-                current += 1
-        self.current = current
-        return co_names
+    def get_names(self):
+        pyc_lst=self.pyclst
+        cur=self.cur
+        names=[]
+        size = dec(cur,pyc_lst)    
+        for i in range(size):
+            if chr(pyc_lst[cur])== TYPE_STRING:
+                char=chr(pyc_lst[cur])
+                length= dec(cur,pyc_lst)
+                cur+=5
+                strng=''
+                for j in range(length):
+                    strng+=chr(pyc_lst[cur+j])
+                if char== TYPE_STRING:
+                     stringref.append(strng)
+                     name_value[strng]=strng
+                cur=cur+length
+                names.append(strng)
+            elif chr(pyc_lst[cur])== TYPE_INTERN:  
+                x= dec(cur,pyc_lst)
+                if x >= INT_LIMIT:
+                    x = x - (2 * INT_LIMIT)
+                names.append(x)
+                cur+=5
+            elif chr(pyc_lst[cur])== TYPE_SREF :  
+                index= dec(cur,pyc_lst)
+                names.append(stringref[index])
+                cur+=5
+        self.cur=cur
+        return names  
 
-    def fun_names(self):
-        global name_cnt
-        current = self.current
-        pyclist = self.pyclist
-        varnames = []
-        n_varnames = decimal(pyclist, current, 4)
-        current += 5
-        for n in range(n_varnames):
-            varnames.append(0)
-            if pyclist[current] == TYPE_INTERN:
-                names[name_cnt] = [0]
-                name_cnt += 1
-                current = skip_element(pyclist,  current)
-            elif pyclist[current] == TYPE_SREF:
-                current += 5
-            else:
-                current += 1
-        self.current = current
-        return varnames
+    def get_varnames(self):
+        pyc_lst = self.pyclst
+        cur = self.cur
+        var_names=[]
+        size = dec(cur,pyc_lst)
+        cur+=5
+        for i in range(size):
+            if chr(pyc_lst[cur])== TYPE_INTERN: 
+                char=chr(pyc_lst[cur])
+                length= dec(cur,pyc_lst)
+                cur+=5
+                strng=''
+                for j in range(length):
+                    strng+= chr(pyc_lst[cur+j])
+                if char== TYPE_SREF:
+                     stringref.append(strng)
+                cur=cur+length
+                var_names.append(strng)
+        self.cur=cur
+        return var_names
 
-    def acq_name(self):
-        global name_cnt
-        current = self.current
-        pyclist = self.pyclist
-        n_field = 0
-        while True:
-                if pyclist[current] == TYPE_TUPLE:
-                    n_field += 1
-                if n_field == 2:
-                    break
-                current += 1
-        current += 5
-        current = skip_element(pyclist, current)
-        self.current = current
-        if pyclist[current] == TYPE_INTERN:
-            names[name_cnt] = [0]
-            name_cnt += 1
-            return name_cnt - 1
-        else:
-            return decimal(pyclist, current, 4)
+    def get_name(self):
+        pyc_lst=self.pyclst
+        cur=self.cur
+        if chr(pyc_lst[cur])== TYPE_TUPLE:
+                length= dec(cur,pyc_lst)
+                char=chr(pyc_lst[cur])
+                cur+=5
+                strng=''
+                for j in range(length):
+                    strng+=chr(pyc_lst[cur+j])
+                if char=='t':
+                     stringref.append(strng)
+                cur=cur+length
+        elif chr(pyc_lst[cur])== TYPE_INTERN: 
+                index= dec(cur,pyc_lst)
+                strng=''
+                for j in range(index):
+                    strng+=chr(pyc_lst[cur+j])
+                cur+=5
+        self.cur=cur
+        return strng
 
-    def view(self):
-        print(" ")
-        print(show_pyc(self.code))
-        print(len(self.consts), 'constants')
-        for i in range(len(self.consts)):
-            if type(self.consts[i]) == int:
-                print(self.consts[i])
-            else:
-                self.consts[i].view()
-        print(self.names)
-        print(self.varnames)
-        print(self.name)
-        print(names)
-        print('')
-
-INT_LIMIT = 2 ** 20
-
-def show_pyc(lst):
-    return [hex(num) for num in l]
-
-
-def decimal(pyc_list, current, no_byte=2):
-    value = 0
-    factor = 0
-    for i in range(no_byte):
-        value |= pyc_list[current+i+1] << factor
-        factor += 8
-    if value >= INT_LIMIT:
-        value = value - 2 * INT_LIMIT
-    return value
-
-
-def start_of_code(pyc_list, current=0):
+def start_of_code(lst, current=0):
     while (pyc_list[current] != TYPE_CODE and
             pyc_list[current+17] != TYPE_STRING):
         current += 1
     return current + 22
 
 
-def skip_element(pycbuf, current):
-    leng = decimal(pycbuf, current, 4)
-    return current + leng + 5
-
-
-def end_of_code(pyc_list, current=0):
-    current += 17  
-    current = skip_element(pyc_list, current)  
-    n_const = decimal(pyc_list, current, 4)
-    current += 5
-    for i in range(n_const):
-        if pyc_list[current] == TYPE_INTEGER:
-            current += 5
-        elif pyc_list[current] == TYPE_NONE:
-            current += 1
-        elif pyc_list[current] == TYPE_CODE:
-            current = end_of_code(pyc_list, current)
-        else:
-            current += 1
-    n_const = 0
-    while True:
-            if pyc_list[current] == TYPE_TUPLE:
-                n_const += 1
-            if n_const == 4:
-                break
-            current += 1
-    current += 5
-    current = skip_element(pyc_list, current)
-    current = skip_element(pyc_list, current)
-    current += 4
-    current = skip_element(pyc_list, current)
-    return current
-
+def dec(cur,lst):
+    x=lst[cur+1]
+    x|=lst[cur+2]<<8
+    x|=lst[cur+3]<<16
+    x|=lst[cur+4]<<24
+    return x
 
 def have_arg(opcode):
-    if opcode < HAVE_ARG:
-        return False
-    else:
-        return True
-
-
-def is_func_def(current, pycbuf):
-    if pycbuf[current] == LOAD_CONSTANT and pycbuf[current+3] == MAKE_FUNCTION:
+    if opcode > HAVE_ARG:
         return True
     else:
         return False
 
+def get_oparg(lst,cur):
+    l = lst[cur+1]
+    m = lst[cur+2]
+    return l | m << 8
 
-def get_op_arg(pycbuf, current):
-    oparg = decimal(pycbuf, current)
-    return oparg
+def read_pyc(filename):
+    lst=[]
+    f=open(filename,'rb')
+    f.read(8)  
+    while True:
+        val = f.read()
+        if val:
+            for byte in val:
+                yield ord(byte)
+        else:
+            break
 
-
-def call_function(objcode, current):
-    argc = objcode.get_oparg(current)
-    func = val1.get_top_n(argc)
-    bkup_locals = func.varnames[:]
-    while argc:
-        argc -= 1
-        func.varnames[argc] = val1.pop()
-    val1.pop()
-    execute(func)
-    func.varnames = bkup_locals[:]
-    return current + 3
-
-def execute(objcode):
-    current = 0
-    while not objcode.is_end(current):
-        opcode = objcode.get_opcode(current)
-        if opcode == CALL_FUNCTION:
-            current = call_function(objcode, current)
-            continue
-        if opcode == RETURN_VALUE:
-            return
-        try:
-            if have_arg(opcode):
-                current = operations[opcode](objcode, current)
-            else:
-                current = operations[opcode](current)
-
-def read_bytes(filename):
-    with open(filename, "rb") as f:
-        while True:
-            val = f.read()
-            if val:
-                for byte in val:
-                    yield ord(byte)
-            else:
-                break
-
-def pyc_list(pycfile):
-    l = list(read_bytes(pycfile))
-    return l
+def pyc_list(filename):
+    return list(read_pyc(filename))
 
 def main():
-        pyc_file = sys.argv[1]
-        l = pyc_list(pyc_file)
-        objcode = Code(l)
-        print()
-        execute(objcode)
+    filename = sys.argv[1]
+    pyc_lst = pyc_list(filename)
+    code_obj = Code(pyc_lst)
+    execute(code_obj)   
 
-if __name__ == '__main__':
-        main()
+if __name__=='__main__':
+    main()
